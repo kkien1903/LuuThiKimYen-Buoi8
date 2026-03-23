@@ -79,7 +79,7 @@ router.post('/forgotpassword', async function (req, res, next) {
     user.forgotpasswordTokenExp = new Date(Date.now() + 10 * 60 * 1000);
     await user.save();
     let URL = 'http://localhost:3000/api/v1/auth/resetpassword/'+ user.forgotpasswordToken;
-    mailHandler.sendMail(user.email,URL);
+    await mailHandler.sendMail(user.email,URL);
     res.send("check mail")
 })
 router.post('/resetpassword/:token',resetPasswordValidator,validateResult, async function (req, res, next) {

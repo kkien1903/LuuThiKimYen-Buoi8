@@ -140,45 +140,67 @@ router.post('/users-excel', uploadExcel.single('file'), async function (req, res
     } else {
         let pathFile = path.join(__dirname, '../uploads', req.file.filename)
         let workbook = new excelJS.Workbook();
-        await workbook.xlsx.readFile(pathFile);
-        let worksheet = workbook.worksheets[0];
-        let result = [];
         
-        for (let index = 2; index <= worksheet.rowCount; index++) {
-            let errorRow = [];
-            const row = worksheet.getRow(index);
-            let username = row.getCell(1).value;
-            let email = row.getCell(2).value;
-
-            if (!username || !email) continue; // Bỏ qua nếu dòng rỗng
-
-            // Sinh password random chuỗi dài 16 kí tự (mã hex)
-            let password = crypto.randomBytes(8).toString('hex');
-            
-            let session = await mongoose.startSession();
-            session.startTransaction();
-            try {
-                let newUser = await userController.CreateAnUser(
-                    username,
-                    password,
-                    email,
-                    "69a5462f086d74c9e772b804", // Role id của user (mặc định trong auth)
-                    session
-                );
-                await session.commitTransaction();
-                await session.endSession();
-                await mailHandler.sendPasswordMail(email, username, password);
-                result.push({ success: true, username: username, email: email });
-            } catch (error) {
-                await session.abortTransaction();
-                await session.endSession();
-                errorRow.push(error.message);
-                result.push({ success: false, data: errorRow, username: username });
+        try {
+            // Kiểm tra định dạng file để đọc cho đúng
+            if (req.file.originalname.endsWith('.csv')) {
+                await workbook.csv.readFile(pathFile);
+            } else {
+                await workbook.xlsx.readFile(pathFile);
             }
+
+            let worksheet = workbook.worksheets[0];
+            let result = [];
+            
+            console.log("==> Tong so dong trong file:", worksheet.rowCount);
+
+            for (let index = 2; index <= worksheet.rowCount; index++) {
+                const row = worksheet.getRow(index);
+                let username = row.getCell(1).value;
+                let email = row.getCell(2).value;
+
+                // Xử lý nếu dữ liệu là object
+                if (email && typeof email === 'object') email = email.text || email.result;
+                if (username && typeof username === 'object') username = username.text || username.result;
+
+                if (!username || !email) continue;
+
+                console.log(`Dang xu ly dong ${index}: ${username} - ${email}`);
+
+                let password = crypto.randomBytes(8).toString('hex');
+                
+                try {
+                    // BỎ TRANSACTION: Gọi trực tiếp hàm tạo user
+                    await userController.CreateAnUser(
+                        username,
+                        password,
+                        email,
+                        "69a5462f086d74c9e772b804" // Role ID mặc định
+                    );
+
+                    // Gửi mail - Bây giờ lệnh này sẽ được thực hiện vì không còn lỗi Transaction
+                    console.log(`   + Dang gui mail cho: ${email}...`);
+                    await mailHandler.sendPasswordMail(email, username, password);
+                    
+                    result.push({ success: true, username: username, email: email });
+                } catch (error) {
+                    let errorMessage = error.message;
+                    // Bắt lỗi 11000 của MongoDB (Duplicate Key)
+                    if (error.code === 11000) {
+                        errorMessage = "Username hoặc Email đã tồn tại trong hệ thống";
+                    }
+                    
+                    console.error(`   - Loi tai dong ${index}:`, errorMessage);
+                    result.push({ success: false, error: errorMessage, username: username });
+                }
+            }
+
+            res.send(result);
+            fs.unlinkSync(pathFile); 
+        } catch (err) {
+            console.error("Loi he thong:", err.message);
+            res.status(500).send({ message: err.message });
         }
-        res.send(result);
-        fs.unlinkSync(pathFile);
     }
 })
-
 module.exports = router;

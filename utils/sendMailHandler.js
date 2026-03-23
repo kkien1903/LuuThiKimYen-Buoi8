@@ -1,30 +1,34 @@
-let nodemailer = require('nodemailer')
+let nodemailer = require('nodemailer');
+
+// Sửa tên biến từ 'transport' thành 'transporter' để khớp với các hàm bên dưới
 const transporter = nodemailer.createTransport({
-    host: "sandbox.smtp.mailtrap.io",
-    port: 25,
-    secure: false, // Use true for port 465, false for port 587
-    auth: {
-        user: "f3309a2d91f3f2",
-        pass: "e1d387e3251f52",
-    },
+  host: "sandbox.smtp.mailtrap.io",
+  port: 2525,
+  auth: {
+    user: "f3309a2d91f3f2",
+    pass: "e1d387e3251f52" // LƯU Ý: Dán đúng password thật của bạn vào đây, không để dấu ****
+  }
 });
+
 module.exports = {
     sendMail: async function (to, url) {
-        await transporter.sendMail({
-            from: '"admin@" <admin@nnptud.com>',
+        // Sử dụng biến 'transporter' đã khai báo ở trên
+        return await transporter.sendMail({
+            from: '"Admin" <admin@nnptud.com>',
             to: to,
-            subject: "mail reset passwrod",
-            text: "lick vo day de doi passs", // Plain-text version of the message
-            html: "lick vo <a href=" + url + ">day</a> de doi passs", // HTML version of the message
+            subject: "Mail reset password",
+            text: "Click vào đây để đổi password", 
+            html: `Click vào <a href="${url}">đây</a> để đổi password`,
         });
     },
     sendPasswordMail: async function (to, username, password) {
-        await transporter.sendMail({
-            from: '"admin@" <admin@nnptud.com>',
+        // Sử dụng biến 'transporter' đã khai báo ở trên
+        return await transporter.sendMail({
+            from: '"Admin" <admin@nnptud.com>',
             to: to,
             subject: "Thông tin tài khoản của bạn",
-            text: `Chào ${username},\nTài khoản của bạn đã được tạo.\nPassword của bạn là: ${password}`,
-            html: `Chào ${username},<br>Tài khoản của bạn đã được tạo.<br>Password của bạn là: <b>${password}</b>`,
+            text: `Chào ${username}, Password của bạn là: ${password}`,
+            html: `<b>Chào ${username}</b>,<br>Password của bạn là: <code>${password}</code>`
         });
     }
 }
